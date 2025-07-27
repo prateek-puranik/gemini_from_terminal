@@ -1,0 +1,84 @@
+#!/usr/bin/env python3
+import os
+import sys
+import argparse
+import google.generativeai as genai
+# NEW: Import the Python Imaging Library (Pillow)
+import PIL.Image
+
+def main():
+    # --- Argument Parsing (with new image argument) ---
+    parser = argparse.ArgumentParser(
+        description="Query the Gemini API with text and/or images from the command line.",
+        formatter_class=argparse.RawTextHelpFormatter
+    )
+    parser.add_argument(
+        "prompt",
+        nargs='*',
+        help="The text prompt to send to the Gemini model."
+    )
+    parser.add_argument(
+        "-i", "--image",
+        nargs='+', # Accept one or more image paths
+        help="Path to one or more images to send with the prompt."
+    )
+    parser.add_argument(
+        "-m", "--model",
+        choices=['flash', 'pro'],
+        default='flash',
+        help="The model to use: 'flash' (default) or 'pro'."
+    )
+    args = parser.parse_args()
+
+    # Exit if no prompt AND no image is provided
+    if not args.prompt and not args.image:
+        parser.print_help()
+        sys.exit(0)
+
+    # --- API Key and Model Setup (this part is the same) ---
+    api_key = os.getenv("GEMINI_API_KEY")
+    if not api_key:
+        print("\033[91mError: GEMINI_API_KEY environment variable not set.\033[0m")
+        sys.exit(1)
+
+    genai.configure(api_key=api_key)
+
+    model_map = {
+        'flash': 'gemini-1.5-flash-latest',
+        'pro': 'gemini-1.5-pro-latest'
+    }
+    model_name = model_map[args.model]
+    model = genai.GenerativeModel(model_name)
+
+    # --- NEW: Build the multimodal content payload ---
+    contents = []
+    # Add the text prompt first, if it exists
+    if args.prompt:
+        contents.append(" ".join(args.prompt))
+
+    # Add images, if they exist
+    if args.image:
+        for image_path in args.image:
+            try:
+                img = PIL.Image.open(image_path)
+                contents.append(img)
+            except FileNotFoundError:
+                print(f"\n\033[91mError: Image file not found at '{image_path}'\033[0m")
+                sys.exit(1)
+            except Exception as e:
+                print(f"\n\033[91mError opening image '{image_path}': {e}\033[0m")
+                sys.exit(1)
+
+    # --- Generate and Print Response (sends the combined text/image content) ---
+    print(f"\033[90mAsking {model_name}...\033[0m")
+
+    try:
+        response = model.generate_content(contents, stream=True)
+        for chunk in response:
+            print(chunk.text, end='', flush=True)
+        print()
+    except Exception as e:
+        print(f"\n\033[91mAn error occurred: {e}\033[0m")
+
+if __name__ == "__main__":
+    main()
