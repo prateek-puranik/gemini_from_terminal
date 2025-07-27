@@ -26,7 +26,7 @@ source ~/.bashrc
 3. Install the Script
 Make the script executable and move it to a location in your PATH.
 
-copy the python file into a file titled 'askg'
+make sure the file is titled 'askg'
 ```
 chmod +x askg
 mkdir -p ~/.local/bin
